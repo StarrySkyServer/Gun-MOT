@@ -186,15 +186,17 @@ public abstract class ItemGunBase extends ItemCustomEdible {
         GunPlugin.getInstance().getCoolDownTimer().addCoolDown(player, (int) (this.getGunData().getReloadTime() * 20), () -> {
             this.getGunData().reloadFinish(player);
             this.setAmmoCount(this.getGunData().getMagSize());
-            player.getInventory().setItem(player.getInventory().getHeldItemIndex(), this);
-            if (player.getGamemode() != Player.CREATIVE) {
-                for (Map.Entry<Integer, Item> entry : player.getInventory().getContents().entrySet()) {
-                    Item item = entry.getValue();
-                    int slot = entry.getKey();
-                    if (item.equals(Item.fromString("gun:" + this.getGunData().getMagName()))) {//todo:debug
-                        item.setCount(item.count - 1);
-                        player.getInventory().setItem(slot, item);
-                        break;
+            if (player.getInventory() != null) {
+                player.getInventory().setItem(player.getInventory().getHeldItemIndex(), this);
+                if (player.getGamemode() != Player.CREATIVE) {
+                    for (Map.Entry<Integer, Item> entry : player.getInventory().getContents().entrySet()) {
+                        Item item = entry.getValue();
+                        int slot = entry.getKey();
+                        if (item.equals(Item.fromString("gun:" + this.getGunData().getMagName()))) {//todo:debug
+                            item.setCount(item.count - 1);
+                            player.getInventory().setItem(slot, item);
+                            break;
+                        }
                     }
                 }
             }
