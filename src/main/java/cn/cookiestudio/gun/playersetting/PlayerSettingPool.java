@@ -7,6 +7,7 @@ import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerJoinEvent;
 import cn.nukkit.utils.Config;
+import lombok.Getter;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ import java.util.Map;
 public class PlayerSettingPool {
 
     private Config config;
+    @Getter
     private final Map<String, PlayerSettingMap> settings = new HashMap<>();
 
     public PlayerSettingPool() {

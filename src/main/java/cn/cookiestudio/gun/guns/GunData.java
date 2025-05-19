@@ -14,12 +14,12 @@ import cn.nukkit.level.Location;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.DestroyBlockParticle;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BVector3;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.AnimateEntityPacket;
 import cn.nukkit.network.protocol.CameraShakePacket;
 import cn.nukkit.network.protocol.SpawnParticleEffectPacket;
-import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import lombok.Builder;
 import lombok.Getter;
@@ -32,7 +32,6 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 
 import static cn.cookiestudio.gun.GunPlugin.plugin;
 
@@ -92,6 +91,7 @@ public class GunData {
         this.animationControllerFP = "controller.animation." + this.gunName + ".first_person";
         this.animationControllerTP = "controller.animation." + this.gunName + ".third_person";
     }
+
     public void shakeCamera(Player player, float intensity, float duration, CameraShakePacket.CameraShakeType shakeType, CameraShakePacket.CameraShakeAction shakeAction) {
         if (player.protocol >= 588) {
             CameraShakePacket packet = new CameraShakePacket();
@@ -102,9 +102,11 @@ public class GunData {
             player.dataPacket(packet);
         }
     }
+
     public void fire(Player player, ItemGunBase gunType) {
         SoundUtil.playSound(player, this.getFireSound(), 1.0F, 1.0F);
-        shakeCamera(player, (float) fireSwingIntensity, 0.1F, CameraShakePacket.CameraShakeType.ROTATIONAL, CameraShakePacket.CameraShakeAction.ADD);
+        // 视角摇晃
+        shakeCamera(player, (float) fireSwingIntensity, (float) fireSwingDuration, CameraShakePacket.CameraShakeType.ROTATIONAL, CameraShakePacket.CameraShakeAction.ADD);
         if (player.isSprinting()) {
             player.setSprinting(false);
             player.sendMovementSpeed(player.getMovementSpeed());
@@ -247,18 +249,20 @@ public class GunData {
             } else {
                 pos1 = entityHuman;
             }
-            Map<String, List<Position>> map = new ConcurrentHashMap<>();
-            Map<Integer, Position> ammoMap = new ConcurrentHashMap<>();
-            Map<Entity, Integer> hitMap = new ConcurrentHashMap<>();
-            List<Position> ammoParticleList = new CopyOnWriteArrayList<>();
-            List<Position> hitParticleList = new CopyOnWriteArrayList<>();
+            // 创建线程安全的集合用于存储粒子效果
+            Map<String, List<Position>> map = new ConcurrentHashMap<>(); // 粒子名称到位置列表的映射
+            Map<Integer, Position> ammoMap = new ConcurrentHashMap<>();  // 子弹轨迹点映射（序号->位置）
+            Map<Entity, Integer> hitMap = new ConcurrentHashMap<>();     // 被击中实体及其对应的子弹序号
+            List<Position> ammoParticleList = new CopyOnWriteArrayList<>(); // 子弹粒子位置列表
+            List<Position> hitParticleList = new CopyOnWriteArrayList<>(); // 击中粒子位置列表
+            // 计算子弹轨迹
             BVector3 face = BVector3.fromLocation(pos1, 0.8);
             Block blocked = null;
             Position blockedPos = null;
             for (int i = 0; i <= range * 20; i++) {
                 Position lastAmmoPos = Position.fromObject(face.addToPos(pos1).add(0, 1.62, 0), pos1.level);
                 Position ammoPos = Position.fromObject(face.extend(0.05).addToPos(pos1).add(0, 1.62, 0), pos1.level);
-                if (!ammoPos.getLevelBlock().canPassThrough()) {
+                if (!ammoPos.getLevelBlock().canPassThrough() && ammoPos.getLevelBlock().isSolid() && !ammoPos.getLevelBlock().isTransparent()) {
                     blocked = ammoPos.getLevelBlock();
                     blockedPos = lastAmmoPos.clone();
                     break;
@@ -266,27 +270,35 @@ public class GunData {
                 ammoMap.put(i, ammoPos);
                 if (i % 4 == 0) ammoParticleList.add(ammoPos);
             }
-            ammoMap.entrySet().stream().forEach(entry -> {
-                FullChunk chunk = entry.getValue().getChunk();
+            // 计算击中实体
+
+            ammoMap.forEach((key, value) -> {
+                FullChunk chunk = value.getChunk();
                 if (chunk == null)
                     return;
-                chunk.getEntities().values().stream().forEach(entity -> {
-                    if (entity.getBoundingBox().isVectorInside(entry.getValue()) && !entity.equals(entityHuman)) {
+                chunk.getEntities().values().forEach(entity -> {
+                    // 原始 碰撞箱
+                    AxisAlignedBB originalBox = entity.getBoundingBox().clone();
+                    AxisAlignedBB expandedBox = originalBox.grow(0.3, 0.3, 0.3);
+                    if (expandedBox.isVectorInside(value) && !entity.equals(entityHuman)) {
                         if (hitMap.containsKey(entity)) {
-                            if (hitMap.get(entity) > entry.getKey()) {
-                                hitMap.put(entity, entry.getKey());
+                            if (hitMap.get(entity) > key) {
+                                hitMap.put(entity, key);
                             }
                         } else {
-                            hitMap.put(entity, entry.getKey());
+                            hitMap.put(entity, key);
                         }
                     }
                 });
             });
-            hitMap.keySet().stream().forEach(entity -> {
+            hitMap.keySet().forEach(entity -> {
                 EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(entityHuman, entity, EntityDamageEvent.DamageCause.ENTITY_ATTACK, (float) hitDamage, 0F);
                 event.setAttackCooldown(0);
-                entity.attack(event);
-                hitParticleList.add(ammoMap.get(hitMap.get(entity)));
+                if (!entity.isClosed() && entity.isAlive()) {
+                    // 主线程处理击中实体
+                    Server.getInstance().getScheduler().scheduleTask(plugin, () -> entity.attack(event));
+                    hitParticleList.add(ammoMap.get(hitMap.get(entity)));
+                }
             });
             for (Position hitPos : hitParticleList) {
                 hitPos.getLevel().addParticle(new DestroyBlockParticle(hitPos, Block.get(152)));

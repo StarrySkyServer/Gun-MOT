@@ -10,6 +10,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+import static cn.cookiestudio.gun.GunPlugin.playerfire;
+import static cn.cookiestudio.gun.utils.taskUtil.Repeating;
+
 @Getter
 public class CoolDownTimer {
 
@@ -19,20 +22,22 @@ public class CoolDownTimer {
         Server.getInstance().getPluginManager().registerEvents(new Listener() {
             @EventHandler
             public void onPlayerInterruptCoolDown(PlayerItemHeldEvent event) {
-                if (coolDownMap.containsKey(event.getPlayer())) {
-                    if (interrupt(event.getPlayer()) == Operator.CANCELLED_EVENT)
-                        event.setCancelled();
+                if (CoolDownTimer.this.coolDownMap.containsKey(event.getPlayer())
+                        && CoolDownTimer.this.interrupt(event.getPlayer())
+                        == CoolDownTimer.Operator.CANCELLED_EVENT) {
+                    event.setCancelled();
                 }
             }
         }, GunPlugin.getInstance());
-        Server.getInstance().getScheduler().scheduleRepeatingTask(GunPlugin.getInstance(), () -> {
-            coolDownMap.forEach((p, c) -> {
-                c.coolDownTick--;
-                if (c.coolDownTick == 0) {
-                    finish(p);
-                }
-            });
-        }, 1);
+        Repeating(() -> coolDownMap.forEach((p, c) -> {
+            c.coolDownTick--;
+            if (c.coolDownTick <= 0) {
+                finish(p);
+            }
+        }), 1, true);
+        Repeating(() -> playerfire.forEach((p, c) -> {
+            c--;
+        }), 1, true);
     }
 
     public Operator interrupt(EntityHuman human) {

@@ -15,7 +15,7 @@ public abstract class ItemMagBase extends ItemCustom {
 
     @Override
     public int getMaxStackSize() {
-        return 16;
+        return 64;
     }
 
     @Override

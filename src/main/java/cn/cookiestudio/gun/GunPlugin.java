@@ -35,6 +35,8 @@ public class GunPlugin extends PluginBase {
     @Getter
     private static GunPlugin instance;
     private final Map<Class<? extends ItemGunBase>, GunData> gunDataMap = new HashMap<>();
+    public static HashMap<Player, Integer> playerfire = new HashMap<>();
+    public static HashMap<Player, Integer> playerFireNeedWaitTime = new HashMap<>();
     private final Map<String, Class<? extends ItemGunBase>> stringClassMap = new HashMap<>();
     private Config config;
     private CoolDownTimer coolDownTimer;
