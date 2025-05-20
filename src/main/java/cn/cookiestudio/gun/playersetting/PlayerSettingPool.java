@@ -60,8 +60,8 @@ public class PlayerSettingPool {
             PlayerSettingMap entry = PlayerSettingMap
                     .builder()
                     .fireMode(PlayerSettingMap.FireMode.MANUAL)
-                    .openTrajectoryParticle(true)
-                    .openMuzzleParticle(true)
+                    .openTrajectoryParticle(false)
+                    .openMuzzleParticle(false)
                     .build();
             settings.put(name, entry);
             return entry;
