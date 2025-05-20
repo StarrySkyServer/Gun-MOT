@@ -334,8 +334,9 @@ public abstract class ItemGunBase extends ItemCustomEdible {
         public void onPlayerInteract(PlayerInteractEvent event) {
             // 使用异步方法处理，避免阻塞主线程
             Async(() -> {
-                if (event.getPlayer().getInventory().getItemInHand() instanceof ItemGunBase && (event.getAction() == cn.nukkit.event.player.PlayerInteractEvent.Action.RIGHT_CLICK_AIR || event.getAction() == cn.nukkit.event.player.PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK)) {
-                    Player p = event.getPlayer();
+                Player p = event.getPlayer();
+                if (p == null || !p.isOnline()) return;
+                if (p.getInventory().getItemInHand() instanceof ItemGunBase && (event.getAction() == cn.nukkit.event.player.PlayerInteractEvent.Action.RIGHT_CLICK_AIR || event.getAction() == cn.nukkit.event.player.PlayerInteractEvent.Action.RIGHT_CLICK_BLOCK)) {
                     int playerfire = GunPlugin.playerfire.get(p);
                     if (playerfire > 6) {
                         GunPlugin.playerfire.put(p, 6);
