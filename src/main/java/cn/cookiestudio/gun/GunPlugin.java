@@ -1,6 +1,8 @@
 package cn.cookiestudio.gun;
 
 import cn.cookiestudio.gun.command.GunCommand;
+import cn.cookiestudio.gun.config.GunConfig;
+import cn.cookiestudio.gun.config.GunConfig.GunSettings;
 import cn.cookiestudio.gun.guns.EntityCustomItem;
 import cn.cookiestudio.gun.guns.GunData;
 import cn.cookiestudio.gun.guns.ItemGunBase;
@@ -15,10 +17,12 @@ import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginBase;
-import cn.nukkit.utils.Config;
+import eu.okaeri.configs.ConfigManager;
+import eu.okaeri.configs.yaml.snakeyaml.YamlSnakeYamlConfigurer;
 import lombok.Getter;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -38,7 +42,7 @@ public class GunPlugin extends PluginBase {
     public static HashMap<Player, Integer> playerfire = new HashMap<>();
     public static HashMap<Player, Integer> playerFireNeedWaitTime = new HashMap<>();
     private final Map<String, Class<? extends ItemGunBase>> stringClassMap = new HashMap<>();
-    private Config config;
+    private GunConfig gunConfig;
     private CoolDownTimer coolDownTimer;
 
     private PlayerSettingPool playerSettingPool;
@@ -75,10 +79,10 @@ public class GunPlugin extends PluginBase {
     @Override
     public void onEnable() {
         instance = this;
+        loadConfig();
         playerSettingPool = new PlayerSettingPool();
         fireTask = new FireTask(this);
         copyResource();
-        config = new Config(getDataFolder() + "/config.yml");
         loadGunData();
         registerEntity();
         registerListener();
@@ -91,7 +95,6 @@ public class GunPlugin extends PluginBase {
     }
 
     private void copyResource() {
-        saveDefaultConfig();
         Path p = Paths.get(Server.getInstance().getDataPath() + "resource_packs/gun.zip");
         if (!Files.exists(p)) {
             this.getLogger().warning("未在目录" + p + "下找到材质包，正在复制，请在完成后重启服务器应用更改");
@@ -103,29 +106,42 @@ public class GunPlugin extends PluginBase {
         }
     }
 
+    private void loadConfig() {
+        File configFile = new File(getDataFolder(), "config.yml");
+        getDataFolder().mkdirs();
+        gunConfig = ConfigManager.create(GunConfig.class, config -> {
+            config.configure(options -> {
+                options.configurer(new YamlSnakeYamlConfigurer());
+                options.bindFile(configFile);
+                options.removeOrphans(true);
+            });
+            config.saveDefaults();
+            config.load(true);
+        });
+    }
+
     private void loadGunData() {
-        Map<String, Object> map = config.getAll();
-        map.entrySet().stream().forEach(e -> {
-            Map<String, Object> value = (Map<String, Object>) e.getValue();
+        gunConfig.guns().forEach((gunName, settings) -> {
             GunData gunData = GunData
                     .builder()
-                    .gunName(e.getKey())
-                    .magName((String) value.get("magName"))
-                    .hitDamage((Double) value.get("hitDamage"))
-                    .fireCoolDown((Double) value.get("fireCoolDown"))
-                    .magSize((Integer) value.get("magSize"))
-                    .slownessLevel((int) value.get("slownessLevel"))
-                    .slownessLevelAim((int) value.get("slownessLevelAim"))
-                    .particle((String) value.get("particle"))
-                    .reloadTime((Double) value.get("reloadTime"))
-                    .range((Double) value.get("range"))
-                    .recoil((Double) value.get("recoil"))
-                    .fireSwingIntensity((Double) value.get("fireSwingIntensity"))
-                    .fireSwingDuration((Double) value.get("fireSwingDuration"))
+                    .gunName(gunName)
+                    .magName(settings.magName())
+                    .hitDamage(settings.hitDamage())
+                    .fireCoolDown(settings.fireCoolDown())
+                    .magSize(settings.magSize())
+                    .slownessLevel(settings.slownessLevel())
+                    .slownessLevelAim(settings.slownessLevelAim())
+                    .particle(settings.particle())
+                    .reloadTime(settings.reloadTime())
+                    .range(settings.range())
+                    .recoil(settings.recoil())
+                    .fireSwingIntensity(settings.fireSwingIntensity())
+                    .fireSwingDuration(settings.fireSwingDuration())
                     .build();
-            gunDataMap.put(stringClassMap.get(e.getKey()), gunData);
+            Class<? extends ItemGunBase> gunClass = stringClassMap.get(gunName);
+            gunDataMap.put(gunClass, gunData);
             try {
-                ItemGunBase itemGun = stringClassMap.get(e.getKey()).newInstance();
+                ItemGunBase itemGun = gunClass.newInstance();
                 Item.registerCustomItem(itemGun.getClass());
                 Item.registerCustomItem(itemGun.getItemMagObject().getClass());
             } catch (InstantiationException | IllegalAccessException exception) {
@@ -155,20 +171,23 @@ public class GunPlugin extends PluginBase {
     }
 
     public void saveGunData(GunData gunData) {
-        String gunName = gunData.getGunName();
-        config.set(gunName + ".magSize", gunData.getMagSize());
-        config.set(gunName + ".fireCoolDown", gunData.getFireCoolDown());
-        config.set(gunName + ".reloadTime", gunData.getReloadTime());
-        config.set(gunName + ".slownessLevel", gunData.getSlownessLevel());
-        config.set(gunName + ".slownessLevelAim", gunData.getSlownessLevelAim());
-        config.set(gunName + ".fireSwingIntensity", gunData.getFireSwingIntensity());
-        config.set(gunName + ".fireSwingDuration", gunData.getFireSwingDuration());
-        config.set(gunName + ".hitDamage", gunData.getHitDamage());
-        config.set(gunName + ".range", gunData.getRange());
-        config.set(gunName + ".particle", gunData.getParticle());
-        config.set(gunName + ".magName", gunData.getMagName());
-        config.set(gunName + ".recoil", gunData.getRecoil());
-        config.save();
+        GunSettings settings = gunConfig.guns().get(gunData.getGunName());
+        if (settings == null) {
+            throw new IllegalArgumentException("Unknown gun: " + gunData.getGunName());
+        }
+        settings.magSize(gunData.getMagSize());
+        settings.fireCoolDown(gunData.getFireCoolDown());
+        settings.reloadTime(gunData.getReloadTime());
+        settings.slownessLevel(gunData.getSlownessLevel());
+        settings.slownessLevelAim(gunData.getSlownessLevelAim());
+        settings.fireSwingIntensity(gunData.getFireSwingIntensity());
+        settings.fireSwingDuration(gunData.getFireSwingDuration());
+        settings.hitDamage(gunData.getHitDamage());
+        settings.range(gunData.getRange());
+        settings.particle(gunData.getParticle());
+        settings.magName(gunData.getMagName());
+        settings.recoil(gunData.getRecoil());
+        gunConfig.save();
     }
 
 }

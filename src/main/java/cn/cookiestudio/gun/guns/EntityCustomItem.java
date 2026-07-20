@@ -25,9 +25,13 @@ public class EntityCustomItem extends EntityItem implements CustomEntity {
             .implementation(EntityCustomItem.class)
             .build();
 
+    public EntityCustomItem(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+        this.setScale(nbt.contains("scale") ? nbt.getFloat("scale") : 1.0f);
+    }
+
     public EntityCustomItem(FullChunk chunk, CompoundTag nbt, int skinId, float scale) {
-        super(chunk, nbt.putInt("skinId", skinId));
-        this.setScale(scale);
+        this(chunk, nbt.putInt("skinId", skinId).putFloat("scale", scale));
     }
 
     @Override
