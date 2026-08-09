@@ -73,7 +73,7 @@ public abstract class ItemGunBase extends ItemCustomEdible {
                     player.sendActionBar(stringBuilder.toString(), 0, 1, 0);
                 }
             }
-        }), 1);
+        }), 1, true);
     }
 
     protected GunData gunData;
@@ -131,14 +131,15 @@ public abstract class ItemGunBase extends ItemCustomEdible {
         if (GunPlugin.getInstance().getCoolDownTimer().isCooling(player)) {
             return ItemGunBase.GunInteractAction.COOLING;
         } else {
-            ItemGunBase itemGun = (ItemGunBase) player.getInventory().getItemInHand();
+            int heldItemIndex = player.getInventory().getHeldItemIndex();
+            ItemGunBase itemGun = (ItemGunBase) player.getInventory().getItem(heldItemIndex);
             if (itemGun.getAmmoCount() > 0) {
                 itemGun.getGunData().fire(player, itemGun);
                 if (player.getGamemode() != 1) {
                     itemGun.setAmmoCount(itemGun.getAmmoCount() - 1);
                 }
 
-                player.getInventory().setItem(player.getInventory().getHeldItemIndex(), itemGun);
+                player.getInventory().setItem(heldItemIndex, itemGun);
                 GunPlugin.getInstance().getCoolDownTimer().addCoolDown(player, (int) (itemGun.getGunData().getFireCoolDown() * 20.0), () -> {
                 }, () -> CoolDownTimer.Operator.NO_ACTION, CoolDownTimer.Type.FIRECOOLDOWN);
                 return ItemGunBase.GunInteractAction.FIRE;
@@ -154,11 +155,12 @@ public abstract class ItemGunBase extends ItemCustomEdible {
         if (GunPlugin.getInstance().getCoolDownTimer().isCooling(entityHuman)) {
             return ItemGunBase.GunInteractAction.COOLING;
         } else {
-            ItemGunBase itemGun = (ItemGunBase) entityHuman.getInventory().getItemInHand();
+            int heldItemIndex = entityHuman.getInventory().getHeldItemIndex();
+            ItemGunBase itemGun = (ItemGunBase) entityHuman.getInventory().getItem(heldItemIndex);
             if (itemGun.getAmmoCount() > 0) {
                 itemGun.getGunData().fire(entityHuman, itemGun);
                 itemGun.setAmmoCount(itemGun.getAmmoCount() - 1);
-                entityHuman.getInventory().setItem(entityHuman.getInventory().getHeldItemIndex(), itemGun);
+                entityHuman.getInventory().setItem(heldItemIndex, itemGun);
                 GunPlugin.getInstance().getCoolDownTimer().addCoolDown(entityHuman, (int) (itemGun.getGunData().getFireCoolDown() * 20.0), () -> {
                 }, () -> CoolDownTimer.Operator.NO_ACTION, CoolDownTimer.Type.FIRECOOLDOWN);
                 return ItemGunBase.GunInteractAction.FIRE;
@@ -183,11 +185,12 @@ public abstract class ItemGunBase extends ItemCustomEdible {
             return false;
         }
         this.getGunData().startReload(player);
+        int reloadSlotIndex = player.getInventory().getHeldItemIndex();
         GunPlugin.getInstance().getCoolDownTimer().addCoolDown(player, (int) (this.getGunData().getReloadTime() * 20), () -> {
             this.getGunData().reloadFinish(player);
             this.setAmmoCount(this.getGunData().getMagSize());
             if (player.getInventory() != null) {
-                player.getInventory().setItem(player.getInventory().getHeldItemIndex(), this);
+                player.getInventory().setItem(reloadSlotIndex, this);
                 if (player.getGamemode() != Player.CREATIVE) {
                     for (Map.Entry<Integer, Item> entry : player.getInventory().getContents().entrySet()) {
                         Item item = entry.getValue();
@@ -216,10 +219,11 @@ public abstract class ItemGunBase extends ItemCustomEdible {
             return false;
         }
         this.getGunData().startReload(entityHuman);
+        int reloadSlotIndex = entityHuman.getInventory().getHeldItemIndex();
         GunPlugin.getInstance().getCoolDownTimer().addCoolDown(entityHuman, (int) (this.getGunData().getReloadTime() * 20), () -> {
             this.getGunData().reloadFinish(entityHuman);
             this.setAmmoCount(this.getGunData().getMagSize());
-            entityHuman.getInventory().setItem(entityHuman.getInventory().getHeldItemIndex(), this);
+            entityHuman.getInventory().setItem(reloadSlotIndex, this);
         }, () -> CoolDownTimer.Operator.INTERRUPT, CoolDownTimer.Type.RELOAD);
         return true;
     }

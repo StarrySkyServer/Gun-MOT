@@ -37,6 +37,7 @@ import static cn.cookiestudio.gun.GunPlugin.plugin;
 
 @Getter
 @Setter
+
 public class GunData {
 
     private static Random random = new Random(System.currentTimeMillis());
@@ -295,8 +296,7 @@ public class GunData {
                 EntityDamageByEntityEvent event = new EntityDamageByEntityEvent(entityHuman, entity, EntityDamageEvent.DamageCause.ENTITY_ATTACK, (float) hitDamage, 0F);
                 event.setAttackCooldown(0);
                 if (!entity.isClosed() && entity.isAlive()) {
-                    // 主线程处理击中实体
-                    Server.getInstance().getScheduler().scheduleTask(plugin, () -> entity.attack(event));
+                    Server.getInstance().getScheduler().scheduleTask(plugin, () -> entity.attack(event), true);
                     hitParticleList.add(ammoMap.get(hitMap.get(entity)));
                 }
             });

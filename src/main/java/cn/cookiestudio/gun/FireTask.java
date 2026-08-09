@@ -35,7 +35,7 @@ public class FireTask extends PluginTask {
 
             }
         }, GunPlugin.getInstance());
-        Server.getInstance().getScheduler().scheduleRepeatingTask(this, 1);
+        Server.getInstance().getScheduler().scheduleRepeatingTask(this, 1, true);
     }
 
     public void onRun(int i) {
